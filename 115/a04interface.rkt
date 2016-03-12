@@ -1,0 +1,118 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname a04interface) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;; CS115 Winter 2016
+;; Assignment 04
+
+;; Question 1
+(define-struct workterm
+  (employer city jobtitle weeklysalary weeks))
+;; A Workterm is a
+;; (make-workterm Str Str Str Nat Nat Nat)
+;; Requires: 
+;;    employer is in all lower case
+;;    city is in all lower case
+;;    jobtitle is in all lower case
+
+(define (placement-acceptable? myworkterm)
+  (and (string-equals? (substring
+                        (- (string-length (workterm-jobtitle myworkterm)) 7)
+                        (string-length (workterm-jobtitle my workterm)))
+                       "analyst")
+       (> (* (workterm-weeklysalary myworkterm)
+             (workterm-weeks myworkterm))
+          6000)))
+
+;; Question 2
+
+(define-struct app
+  (name size OS publisher))
+;; An App is a
+;; (make-app Str Num Sym Str)
+;; Requires:
+;;    name is in all lower case
+;;    size > 0 is recorded in MB
+;;    OS is one of 'ios, 'android, 'blackberry, 'other
+;;    publisher is in all lower case
+
+(define-struct smartphone
+  (manufacturer OS OSversion favourite))
+;; A Smartphone is a
+;; (make-smartphone Str Sym Str App)
+;; Requires:
+;;    manufacturer is in all lower case
+;;    OS is one of 'ios, 'android, 'blackberry, 'other
+;;    OSversion is composed of
+;;    numeric digits 0-9, separated by a single period
+;;    favourite is the user's favourite app
+
+
+;; templet for smartphone: Smartphone -> Any
+;; fields
+(define 
+  . . . (smartphone-manufacturer info)
+  . . . (smartphone-OS info). . .
+  . . . (smartphone-OSversion info). . .
+  . . . (smartphone-favourite info). . .)
+
+;; Part (b)
+(define (initialize-smartphone myname myOS myOSversion)
+  (make-smartphone myname
+                   myOS
+                   myOSversion
+                   (make-app "none" 0 ’other "none"))) ; note about constants, may need prev define
+
+;; Part (c)
+(define
+  (update-favourite mysmartphone myname mysize myOS mypublisher)
+  (make-smartphone (smartphone-manufacturer mysmartphone)
+                   (smartphone-OS mysmartphone)
+                   (smartphone-OSversion mysmartphone)
+                   (make-app myname mysize myOS mypublisher)))
+
+;; Question 3
+
+(define-struct food
+  (name foodgroup unitmass unitprice))
+;; A Food is a
+;; (make-food Str Sym Nat Num)
+;; Requires:
+;;    name is in all lower case
+;;    foodgroup is one of 'grains, 'vegetables, 'dairy, 'meats
+;;    unitmass is recorded in g
+;;    unitprice >0 is recorded in dollars per 100 g
+
+(define-struct drink
+  (name type container containersize unitprice))
+;; A Drink is a
+;; (make-drink Str Sym Sym Nat Num)
+;; Requires:
+;;    name is in all lower case
+;;    type is one of 'water, 'juice, 'soft-drink, 'beer, 'wine
+;;    container is one of 'bottle, 'can, 'box
+;;    containersize is recorded in mL
+;;    unitprice >0 is recorded in dollars per 100 mL
+
+;; A Refreshment is one of:
+;;   * a Food or
+;;   * a Drink
+
+(define (adjusted-price myrefreshment)
+  (cond [(drink? myrefreshment)
+         (cond [(symbol=? (drink-type myrefreshment) 'beer)
+                (make-drink (drink-name myrefreshment)
+                            (drink-type myrefreshment)
+                            (drink-container myrefreshment)
+                            (drink-containersize myrefreshment)
+                            (drink-unitprice myrefreshment * beerup-price))]
+               [(and (symbol=? (drink-type myrefreshment) 'beer) 
+                     (make-drink (drink-name myrefreshment)
+                                 (drink-type myrefreshment)
+                                 (drink-container myrefreshment)
+                                 (drink-containersize myrefreshment)
+                                 (drink-unitprice myrefreshment * beerup-price))]
+(make-drink (drink-name myrefreshment)
+            (drink-type myrefreshment)
+            (drink-container myrefreshment)
+            (drink-containersize myrefreshment)
+            (drink-unitprice myrefreshment * beerup-price))]])

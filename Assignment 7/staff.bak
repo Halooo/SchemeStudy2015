@@ -1,0 +1,22 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-reader.ss" "lang")((modname staff) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #t)))
+;;
+;; ***************************************************
+;; Hao Sun(20611135)
+;; CS 135 Fall 2015
+;; Assignment 07, Problem 1
+;; ***************************************************
+;;
+
+;; A Department-List is a (listof Str)
+(define-struct staff-member (id name dept))
+;; A Staff-Member is a (make-staff-member Nat Str Str)
+;; requires: id is unique
+;; (i.e., every staff-member with the same id also has the same name)
+(define-struct salary (staff-id base bonus))
+;; A Salary is a (make-salary Nat Num Num)
+;; requires: base, bonus ≥ 0
+;; A Staff-List is a (listof Staff-Member)
+;; requires: elements are sorted by increasing id
+;; A Salary-List is a (listof Salary)

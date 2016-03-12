@@ -1,0 +1,479 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname puzzle) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #t)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The following line is REQUIRED (do not remove)
+(require "puzlib.rkt")
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Place your Personal Identification here
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; DATA DEFINITIONS
+
+;; A Puzzle is a (list (listof String) (listof String))
+
+;; A Grid is a (listof (listof Char))
+
+(define-struct wpos (row col horiz? len))
+;; A WPos (Word Position) is a (make-wpos Nat Nat Bool Nat)
+;; requires: len > 1
+
+(define-struct state (grid positions words))
+;; A State is a (make-state Grid (listof WPos) (listof Str))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; CONSTANTS FOR TESTING:
+
+(define puzz01 (read-puzzle "puzzle01.txt"))
+(define grid-abc '((#\A #\B #\C) (#\X #\Y #\Z)))
+(define test-puzzle-grid
+  (list (string->list "##.####..#")
+        (string->list ".#.#..####")
+        (string->list "#####.#..#")
+        (string->list ".#.#..####")))
+
+(define test-puzzle-grid-solution
+  (list (string->list "op.luck..d")
+        (string->list ".e.u..ilio")
+        (string->list "bench.n..g")
+        (string->list ".k.k..dice")))
+(define test-puzzle (list 
+                     (list "##.####..#" ".#.#..####"
+                           "#####.#..#" ".#.#..####")
+                     (list "bench" "peek" "luck" "luck"
+                           "illio" "kind" "doge" "dice" "op")))
+(define test-puzzle-initial-state
+  (make-state
+   (list
+    (list #\# #\# #\. #\# #\# #\# #\# #\. #\. #\#)
+    (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)
+    (list #\# #\# #\# #\# #\# #\. #\# #\. #\. #\#)
+    (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#))
+   (list
+    (make-wpos 0 0 #true 2)
+    (make-wpos 0 3 #true 4)
+    (make-wpos 1 6 #true 4)
+    (make-wpos 2 0 #true 5)
+    (make-wpos 3 6 #true 4)
+    (make-wpos 0 1 #false 4)
+    (make-wpos 0 3 #false 4)
+    (make-wpos 0 6 #false 4)
+    (make-wpos 0 9 #false 4))
+   (list "bench" "peek" "luck" "luck"
+         "illio" "kind" "doge" "dice" "op")))
+
+(define test-puzzle-last-step
+  (make-state
+   (list
+    (list #\o #\p #\. #\l #\u #\c #\k #\. #\. #\d)
+    (list #\. #\e #\. #\u #\. #\. #\i #\l #\i #\o)
+    (list #\# #\e #\n #\c #\# #\. #\n #\. #\. #\g)
+    (list #\. #\k #\. #\k #\. #\. #\d #\i #\c #\e))
+   (list
+    (make-wpos 2 0 true 5))
+   (list "bench")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; PROVIDED HELPER:
+
+;; (flip wp) transposes wp by reversing row/col and negating horiz?
+;; flip: WPos -> WPos
+;; Example:
+(check-expect (flip (make-wpos 3 4 true 5))
+              (make-wpos 4 3 false 5))
+
+(define (flip wp)
+  (make-wpos (wpos-col wp) (wpos-row wp) (not (wpos-horiz? wp)) (wpos-len wp)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; REQUIRED FUNCTIONS:
+
+
+;; (transpose g) takes a grid and return the transpose of the grid
+;; transpose: Grid -> Grid
+;; Examples:
+(check-expect (transpose grid-abc) '((#\A #\X) (#\B #\Y) (#\C #\Z)))
+
+(define (transpose g)
+  (cond [(empty? (first g)) empty]
+        [else (cons (map first g)
+                    (transpose (map rest g)))]))
+
+;; Tests:
+(check-expect (transpose test-puzzle-grid)
+              (list
+               (list #\# #\. #\# #\.)
+               (list #\# #\# #\# #\#)
+               (list #\. #\. #\# #\.)
+               (list #\# #\# #\# #\#)
+               (list #\# #\. #\# #\.)
+               (list #\# #\. #\. #\.)
+               (list #\# #\# #\# #\#)
+               (list #\. #\# #\. #\#)
+               (list #\. #\# #\. #\#)
+               (list #\# #\# #\# #\#)))
+
+(check-expect (transpose test-puzzle-grid-solution)
+              (list
+               (list #\o #\. #\b #\.)
+               (list #\p #\e #\e #\k)
+               (list #\. #\. #\n #\.)
+               (list #\l #\u #\c #\k)
+               (list #\u #\. #\h #\.)
+               (list #\c #\. #\. #\.)
+               (list #\k #\i #\n #\d)
+               (list #\. #\l #\. #\i)
+               (list #\. #\i #\. #\c)
+               (list #\d #\o #\g #\e)))
+
+;; (find-wpos loc row)
+;; find-wpos: (listof Char) Nat -> (listof WPos)
+;; Examples:
+#|(check-expect (find-wpos (string->list "####") 0)
+              (list (make-wpos 0 0 true 4)))|#
+
+(define (find-wpos loc row)
+  (local [; (drop lst n) takes a lst and n, return a list which
+          ;   is sublist from n to the end
+          ; drop: (listof Any) Nat -> (listof Any)
+          (define (drop lst n)
+            (cond [(or (empty? lst) (zero? n)) lst]
+                  [else (drop (rest lst) (sub1 n))]))
+          ; (count#s lst n) takes lst and n, return a list with
+          ;   position index n as first element, and a list of
+          ;   #\#s before the first #\. from left to right
+          ; count#s: (lstof Char) Nat -> (cons Nat (listof Char))
+          ; Require: Nat starts from 0
+          (define (count#s lst n)
+            (cond [(empty? lst) (list n)]
+                  [(char=? (first lst) #\#)
+                   (cons #\# (count#s (rest lst) (add1 n)))]
+                  [(char=? (first lst) #\.)
+                   (list n)]))
+          ; (find-wpos-helper lst cur) takes a lst and cur wich
+          ;   represents the current position as accumulator; return
+          ;   a list of wpos containing the coordinats of all #\#s and
+          ;   the length of each set of #\#s
+          ; find-wpos-helper: (listof Char) Nat -> Wpos
+          ; require: cur starts from 0
+          (define (find-wpos-helper lst cur)
+            (cond [(empty? lst) empty]
+                  [(char=? (first lst) #\.)
+                   (find-wpos-helper (rest lst) (add1 cur))]
+                  [(char=? (first lst) #\#)
+                   (local [(define process-lst (reverse (count#s lst 0)))]
+                     (cond [(= 1 (length (rest process-lst)))
+                            (find-wpos-helper (drop lst (first process-lst))
+                                              (+ (first process-lst) cur))]
+                           [else (cons (make-wpos row cur true (length (rest process-lst)))
+                                       (find-wpos-helper
+                                        (drop lst (first process-lst))
+                                        (+ (first process-lst) cur)))]))]))]
+    (find-wpos-helper loc 0)))
+
+;; Tests:
+(check-expect (find-wpos (string->list "###") 5)
+              (list (make-wpos 5 0 true 3)))
+(check-expect (find-wpos (string->list "..####..") 5)
+              (list (make-wpos 5 2 true 4)))
+(check-expect (list (find-wpos (first test-puzzle-grid) 0)
+                    (find-wpos (second test-puzzle-grid) 1)
+                    (find-wpos (third test-puzzle-grid) 2)
+                    (find-wpos (fourth test-puzzle-grid) 3))
+              (list
+               (list
+                (make-wpos 0 0 #true 2)
+                (make-wpos 0 3 #true 4))
+               (list (make-wpos 1 6 #true 4))
+               (list (make-wpos 2 0 #true 5))
+               (list (make-wpos 3 6 #true 4))))
+
+(check-expect (list (find-wpos (first (transpose test-puzzle-grid)) 0)
+                    (find-wpos (second (transpose test-puzzle-grid)) 1)
+                    (find-wpos (third (transpose test-puzzle-grid)) 2)
+                    (find-wpos (fourth (transpose test-puzzle-grid)) 3)
+                    (find-wpos (fifth (transpose test-puzzle-grid)) 4)
+                    (find-wpos (sixth (transpose test-puzzle-grid)) 5)
+                    (find-wpos (seventh (transpose test-puzzle-grid)) 6))
+              (list
+               empty
+               (list (make-wpos 1 0 true 4))
+               empty
+               (list (make-wpos 3 0 true 4))
+               empty
+               empty
+               (list (make-wpos 6 0 true 4))))
+
+;; the order does not matter: here is an example
+;; that uses lists-equiv?
+(check-expect (lists-equiv?
+               (find-wpos (string->list "..####...###..") 5)
+               (list (make-wpos 5 2 true 4)
+                     (make-wpos 5 9 true 3)))
+              true)
+(check-expect (find-wpos (string->list "#.#..#.#") 5)
+              empty)
+
+
+;; (initial-state puzzle)
+;; initial-state: Puzzle -> State
+;;Examples:
+(check-expect (initial-state puzz01)
+              (make-state (list (list #\# #\# #\#))
+                          (list (make-wpos 0 0 true 3))
+                          (list "CAT")))
+
+(define (initial-state puzzle)
+  (local [(define grd (map string->list (first puzzle)))
+          ; (all-wpos grid n) takes a grid and accumulator n,
+          ;   return all posible wpos horizontaly in the grid
+          ; all-wpos: (listof Char) Nat -> (listof Wpos)
+          (define (all-wpos grid n)
+            (cond [(empty? grid) empty]
+                  [else (append (find-wpos (first grid) n)
+                                (all-wpos (rest grid) (add1 n)))]))]
+    (make-state grd 
+                (append (all-wpos grd 0)
+                        (map flip (all-wpos (transpose grd) 0)))
+                (second puzzle))))
+
+;; Tests:
+(check-expect (initial-state test-puzzle) test-puzzle-initial-state)
+
+;; (extract-wpos g wp)
+;; extract-wpos: Grid WPos -> (listof Char)
+;; Examples: 
+(check-expect (extract-wpos grid-abc (make-wpos 0 0 true 2)) '(#\A #\B))
+(check-expect (extract-wpos grid-abc (make-wpos 0 0 false 2)) '(#\A #\X))
+(check-expect (extract-wpos grid-abc (make-wpos 0 2 false 2)) '(#\C #\Z))
+
+(define (extract-wpos g wp)
+  (local [; (get-row g r) takes a grid and a r, row number, return the row
+          ; get-row: (listof (listof Char)) Nat -> (listof Char)
+          (define (get-row g r)
+            (cond [(zero? r) (first g)]
+                  [else (get-row (rest g) (sub1 r))]))
+          ; (get-word loc n) takes an loc and n, return a list of char which
+          ;   are all #\#s in loc
+          ; get-word: (listof Char) Nat -> (listof Char)
+          (define (get-word loc n)
+            (cond [(empty? loc) empty]
+                  [(and (not (char=? (first loc) #\.))
+                        (not (zero? n))) (cons (first loc) (get-word (rest loc) (sub1 n)))]
+                  [else empty]))
+          ; (get-element g r c n) takes a grid, r, c and accumulator n, return the list of char
+          ;   which indicated by the coordinate (r,c)
+          (define (get-element g r c n)
+            (cond [(zero? c) (get-word (get-row g r) n)]
+                  [else (get-element (map rest g) r (sub1 c) n)]))]
+    (cond [(wpos-horiz? wp) (get-element g (wpos-row wp) (wpos-col wp) (wpos-len wp))]
+          [else (get-element (transpose g) (wpos-col wp) (wpos-row wp) (wpos-len wp))])))
+
+
+;; Tests:
+(check-expect (extract-wpos test-puzzle-grid-solution (make-wpos 0 3 true 4)) (list #\l #\u #\c #\k))
+(check-expect (extract-wpos test-puzzle-grid-solution (make-wpos 2 0 true 5)) (list #\b #\e #\n #\c #\h))
+(check-expect (extract-wpos test-puzzle-grid-solution (flip (make-wpos 1 0 true 4))) (list #\p #\e #\e #\k))
+(check-expect (extract-wpos test-puzzle-grid-solution (flip (make-wpos 3 0 true 4))) (list #\l #\u #\c #\k))
+
+;; (replace-wpos g wp loc) depends on the row, col and len value of given wp, replaces the characters
+;;   on g at the given (row, col) coordinates horizontaly
+;; replace-wpos: Grid WPos (listof Char) -> Grid
+;; requires: len in WPos is equal to length of (listof Char)
+;; Examples:
+(check-expect (replace-wpos grid-abc (make-wpos 0 0 true 2) '(#\J #\K))
+              '((#\J #\K #\C) (#\X #\Y #\Z)))
+(check-expect (replace-wpos grid-abc (make-wpos 0 0 false 2) '(#\J #\K))
+              '((#\J #\B #\C) (#\K #\Y #\Z)))
+(check-expect (replace-wpos grid-abc (make-wpos 0 2 false 2) '(#\J #\K))
+              '((#\A #\B #\J) (#\X #\Y #\K)))
+
+(define (replace-wpos g wp loc) 
+  (local [; (drop lst n) takes a lst and n, return a list which
+          ;   is sublist from n to the end
+          ; drop: (listof Any) Nat -> (listof Any)
+          (define (drop lst n)
+            (cond [(or (empty? lst) (zero? n)) lst]
+                  [else (drop (rest lst) (sub1 n))]))
+          ; (get-c lst c loc) takes a lst c and loc, return the colume
+          ;   get-c: (listof Char) Nat (listof Char) -> (listof Char)
+          (define (get-c lst c loc)
+            (cond [(not (zero? c)) (cons (first lst) (get-c (rest lst) (sub1 c) loc))]
+                  [else (append loc (drop lst (length loc)))]))
+          ; (replace-element g r c loc) replaces the element in a row of g and return a
+          ;   grid with the given position (r, c) and coresponding chars after (r, c)
+          ;   being replaced by loc
+          ; replace-element: Grid Nat Nat (listof Char) -> Grid
+          (define (replace-element g r c loc)
+            (cond [(not (zero? r)) (cons (first g) (replace-element (rest g) (sub1 r) c loc))]
+                  [else (cons (get-c (first g) c loc) (rest g))]))]
+    (cond [(wpos-horiz? wp) (replace-element g (wpos-row wp) (wpos-col wp) loc)]
+          [else (transpose (replace-element (transpose g) (wpos-col wp) (wpos-row wp) loc))]))
+  )
+
+;; Tests:
+(check-expect (replace-wpos test-puzzle-grid (make-wpos 0 3 true 4) (string->list "luck"))
+              (list
+               (list #\# #\# #\. #\l #\u #\c #\k #\. #\. #\#)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)
+               (list #\# #\# #\# #\# #\# #\. #\# #\. #\. #\#)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)))
+(check-expect (replace-wpos test-puzzle-grid (make-wpos 0 0 true 2) (string->list "op"))
+              (list
+               (list #\o #\p #\. #\# #\# #\# #\# #\. #\. #\#)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)
+               (list #\# #\# #\# #\# #\# #\. #\# #\. #\. #\#)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)))
+(check-expect (replace-wpos test-puzzle-grid (flip (make-wpos 9 0 true 4)) (string->list "doge"))
+              (list
+               (list #\# #\# #\. #\# #\# #\# #\# #\. #\. #\d)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\o)
+               (list #\# #\# #\# #\# #\# #\. #\# #\. #\. #\g)
+               (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\e)))
+(check-expect (replace-wpos test-puzzle-grid (flip (make-wpos 3 0 true 4)) (string->list "luck"))
+              (list
+               (list #\# #\# #\. #\l #\# #\# #\# #\. #\. #\#)
+               (list #\. #\# #\. #\u #\. #\. #\# #\# #\# #\#)
+               (list #\# #\# #\# #\c #\# #\. #\# #\. #\. #\#)
+               (list #\. #\# #\. #\k #\. #\. #\# #\# #\# #\#)))
+
+;; (fit? word cells) predicates if a word can fit in the given cell by charactor and
+;;   length
+;; fit? (listof Char) (listof Char) -> Bool
+;; Examples:
+(check-expect (fit? (string->list "STARWARS") (string->list "S##RW##S")) true)
+(check-expect (fit? (string->list "STARWARS") (string->list "S##RT##K")) false)
+
+(define (fit? word cells) 
+  (cond [(and (empty? cells) (empty? word)) true]
+        [(or (empty? cells) (empty? word) ) false]
+        [(or (char=? #\# (first cells)) (char=? (first word) (first cells))) (fit? (rest word) (rest cells))]
+        [else false]))
+
+;; Tests:
+(check-expect (fit? (string->list "BENCH") (string->list "###")) false)
+(check-expect (fit? (string->list "BENCH") (string->list "B###")) false)
+(check-expect (fit? (string->list "BENCH") (string->list "B#####")) false)
+(check-expect (fit? (string->list "BENCH") (string->list "BE##")) false)
+(check-expect (fit? (string->list "BENCH") (string->list "BEN##")) true)
+(check-expect (fit? (string->list "BENCH") (string->list "BENC#")) true)
+(check-expect (fit? (string->list "BENCH") (string->list "BENCH")) true)
+(check-expect (fit? (string->list "BENCH") (string->list "####H")) true)
+(check-expect (fit? (string->list "BENCH") (string->list "#E##H")) true)
+
+;; (neighbours s) consume one state, prodcue the next possible routes of (listof State), and replace-wpos in
+;;   the characters to the coresponse coordinate. return a lsit of state which have not been processed yet
+;; neighbours: State -> (listof State)
+;; Examples:
+(check-expect (neighbours (make-state (list (list #\# #\# #\#))
+                                      (list (make-wpos 0 0 true 3))
+                                      (list "CAT")))
+              (list (make-state '((#\C #\A #\T)) empty empty)))
+
+(define (neighbours s)
+  (local [; (sort-pos g wpos) sort the positions in g. which the ones with most-filled characters are in
+          ;   the beginning of the list
+          ; sort-pos: Grid (list of Wpos) -> (listof Wpos)
+          (define (sort-pos g wpos)
+            (local [(define (most-filled lst)
+                      (cond [(empty? lst) 0]
+                            [(not (char=? (first lst) #\#))
+                             (add1 (most-filled (rest lst)))]
+                            [else (most-filled (rest lst))]))]
+              (sort wpos (lambda (x y) (> (most-filled (extract-wpos g x)) (most-filled (extract-wpos g y)))))))
+          ; constant
+          (define processed-wpos (sort-pos (state-grid s) (state-positions s)))
+          ; (neighbours-helper s orig-words) takes a s and orig-words, prodcue the next possible routes of (listof State), 
+          ;   and replace-wpos in the characters to the coresponse coordinate. return a lsit of state which have not
+          ;   been processed yet. 
+          ; neighbours-helper: State (listof Str) -> (listof State)
+          (define (neighbours-helper s orig-words) 
+            (cond [(empty? orig-words) empty]
+                  [(fit? (string->list (first orig-words)) (extract-wpos (state-grid s) (first processed-wpos)))
+                   (cons (make-state (replace-wpos (state-grid s) (first processed-wpos) (string->list (first orig-words)))
+                                     (rest processed-wpos) (remove (first orig-words) (state-words s))) (neighbours-helper s (rest orig-words)))]
+                  [else (neighbours-helper s (rest orig-words))]))]
+    (neighbours-helper s (state-words s))))
+
+
+;; Tests:
+(check-expect (neighbours (make-state '((#\C #\# #\#))
+                                      (list (make-wpos 0 0 true 3))
+                                      '("CAT" "DOG" "CAR")))
+              (list (make-state '((#\C #\A #\T)) empty '("DOG" "CAR"))
+                    (make-state '((#\C #\A #\R)) empty '("CAT" "DOG"))))
+(check-expect 
+ (neighbours test-puzzle-last-step)
+ (list
+  (make-state
+   (list
+    (list #\o #\p #\. #\l #\u #\c #\k #\. #\. #\d)
+    (list #\. #\e #\. #\u #\. #\. #\i #\l #\i #\o)
+    (list #\b #\e #\n #\c #\h #\. #\n #\. #\. #\g)
+    (list #\. #\k #\. #\k #\. #\. #\d #\i #\c #\e))
+   empty
+   empty)))
+(check-expect 
+ (neighbours test-puzzle-initial-state)
+ (list
+  (make-state
+   (list
+    (list #\o #\p #\. #\# #\# #\# #\# #\. #\. #\#)
+    (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#)
+    (list #\# #\# #\# #\# #\# #\. #\# #\. #\. #\#)
+    (list #\. #\# #\. #\# #\. #\. #\# #\# #\# #\#))
+   (list
+    (make-wpos 0 3 #true 4)
+    (make-wpos 1 6 #true 4)
+    (make-wpos 2 0 #true 5)
+    (make-wpos 3 6 #true 4)
+    (make-wpos 0 1 #false 4)
+    (make-wpos 0 3 #false 4)
+    (make-wpos 0 6 #false 4)
+    (make-wpos 0 9 #false 4))
+   (list "bench" "peek" "luck" "luck" "illio" "kind" "doge" "dice"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; PROVIDED FUNCTIONS:
+
+;; (solved? s) determines if s is a solved criss-cross problem
+;;   by checking if all of the word positions have been filled
+;; solved?: State -> Bool
+(define (solved? s)
+  (empty? (state-positions s)))
+
+
+;; (criss-cross puzzle) produces a list of strings corresponding
+;;   to the solution of the the criss-cross puzzle,
+;;   or false if no solution is possible
+;; criss-cross: Puzzle -> (anyof false (listof Str))
+
+(define (criss-cross puzzle)
+  (local [(define result (solve (initial-state puzzle)
+                                neighbours
+                                solved?))]
+    (cond [(false? result) false]
+          [else (map list->string (state-grid result))])))
+
+(check-expect (criss-cross puzz01) '("CAT"))
+
+;; note that [solve] (used in criss-cross above) is provided in puzlib.rkt
+
+;; when you are all done, you can use disp to
+;; view your solutions:
+
+;(disp (criss-cross (read-puzzle "puzzle04.txt")))
+(time (criss-cross (read-puzzle "puzzle10.txt")))
+
+;; NOTE: Do NOT leave top-level expressions in your code.
+;;       In other words, when your code is run, only the
+;;       check-expect message "All X tests passed!"
+;;       should appear in the interactions window
+

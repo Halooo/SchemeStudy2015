@@ -1,0 +1,114 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname matrix) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #t)))
+;;
+;; ***************************************************
+;; Hao Sun(20611135)
+;; CS 135 Fall 2015
+;; Assignment 06, Problem 3
+;; ***************************************************
+;;
+
+
+(define M (list (list 1 2 3) (list 4 5 6) (list 7 8 9)))
+(define N (list (list 1 0 0) (list 0 1 0) (list 0 0 1)))
+(define A (list (list 1 2 3) (list 4 5 6) (list 7 8 9) (list 10 11 12)))
+(define B (list (list 1 0 0) (list 0 1 0) (list 0 0 1) (list 0 0 0)))
+(define C (list (list 1 2 3 4) (list 4 5 6 7) (list 7 8 9 10)))
+(define D (list (list 1 0 0 0) (list 0 1 0 0) (list 0 0 0 1)))
+;; (matrix-row m rn) takes a matrix m and rn as n-th row and return the n-th row
+;; matrix-row: (listof (listof Num)) Nat -> List
+;; require m must be non-empty
+;; example
+(check-expect (matrix-row M 2) (list 7 8 9))
+(check-expect (matrix-row N 0) (list 1 0 0))
+(define (matrix-row m rn)
+  (cond [(zero? rn) (first m)]
+        [else (matrix-row (rest m) (sub1 rn))]))
+;; test:
+(check-expect (matrix-row A 3) (list 10 11 12))
+(check-expect (matrix-row B 1) (list 0 1 0))
+(check-expect (matrix-row C 2) (list 7 8 9 10))
+(check-expect (matrix-row D 0) (list 1 0 0 0))
+
+;; (reduce-col m) reduces m by eliminating the left most column of m
+;; reduce-col: (listof (listof Num)) -> (listof (listof Num))
+;; example
+(check-expect (reduce-col M) (list (list 2 3) (list 5 6) (list 8 9)))
+(check-expect (reduce-col N) (list (list 0 0) (list 1 0) (list 0 1)))
+(define (reduce-col m)
+  (cond [(empty? m) empty]
+        [else (cons (rest (first m)) (reduce-col (rest m)))]))
+
+;; (matrix-col m cn) takes a matrix m and cn as n-th column and return the n-th column
+;; matrix-col: (listof (listof Num)) Nat -> List
+;; require m must be non-empty 
+;; example
+(check-expect (matrix-col M 2) (list 3 6 9))
+(check-expect (matrix-col N 0) (list 1 0 0))
+(define (matrix-col m cn)
+  (cond [(empty? m) empty]
+        [(zero? cn) (cons (first (first m)) (matrix-col (rest m) cn))]
+        [else (matrix-col (reduce-col m) (sub1 cn))]))
+
+;; test:
+(check-expect (matrix-col A 2) (list 3 6 9 12))
+(check-expect (matrix-col B 1) (list 0 1 0 0))
+(check-expect (matrix-col C 3) (list 4 7 10))
+(check-expect (matrix-col D 0) (list 1 0 0))
+
+;; (get-element m r c) will get the element in matrix m at position (r,c) or
+;;    we say the element a_rc
+;; get-element: (listof (listof Num)) Nat Nat -> Num
+;; require M is none-empty and identical demensions
+;; example
+(check-expect (get-element M 0 2) 3)
+(check-expect (get-element N 1 1) 1)
+
+(define (get-element m r c)
+  (cond [(zero? c) (first (matrix-row m r))]
+        [else (get-element (reduce-col m) r (sub1 c))]))
+;; test
+(check-expect (get-element A 3 0) 10)
+(check-expect (get-element B 3 1) 0)
+(check-expect (get-element C 1 3) 7)
+(check-expect (get-element D 2 3) 1)
+
+;; (matrix-add-row r1 r2) takes two lists r1 and r2 and add each element in it
+;;    return a new list with same length as r1 r2 with the sum as its new elements
+;; matrix-add-row: (listof Num) (listof Num) -> (listof Num)
+;; require M is none-empty and identical demensions
+;; example
+(check-expect (matrix-add-row (list 0 1 2) (list 2 3 3)) (list 2 4 5))
+(check-expect (matrix-add-row (list 0 0) (list 1 3)) (list 1 3))
+(check-expect (matrix-add-row (first M) (first N)) (list 2 2 3))
+(define (matrix-add-row r1 r2)
+  (cond [(empty? r1) empty]
+        [else (cons (+ (first r1) (first r2)) 
+                    (matrix-add-row (rest r1) (rest r2)))]))
+
+;; (matrix-add m1 m2) takes 2 matrixes and return the addition resultant matrix
+;; matrix-add: (listof (listof Num)) (listof (listof Num)) -> (listof (listof Num))
+;; require M is none-empty and identical demensions
+;; example
+(check-expect (matrix-add M N) (list (list 2 2 3) (list 4 6 6) (list 7 8 10)))
+(check-expect (matrix-add (list (list 0 0)) (list (list 1 9))) (list (list 1 9)))
+(define (matrix-add m1 m2)
+  (cond [(empty? m1) empty]
+        [else (cons (matrix-add-row (first m1) (first m2))
+        (matrix-add (rest m1) (rest m2)))]))
+;; test
+(check-expect (matrix-add (list (list 1 0) (list 0 1)) (list (list 99 99) (list 88 88)))
+              (list (list 100 99) (list 88 89)))
+(check-expect (matrix-add (list (list 0)) (list (list 0)))
+              (list (list 0)))
+(check-expect (matrix-add A B)
+              (list (list 2 2 3) (list 4 6 6) (list 7 8 10) (list 10 11 12)))
+(check-expect (matrix-add C D)
+              (list (list 2 2 3 4) (list 4 6 6 7) (list 7 8 9 11)))
+
+;; (matrix-multiply m1 m2) takes 2 matrixes m1 and m2 return the cross product
+;;    of m1 and m2 (can be different dimension)
+;; matrix-multiply: (listof (listof Num)) (listof (listof Num)) -> (listof (listof Num))
+;; example:
+

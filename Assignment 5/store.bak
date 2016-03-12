@@ -1,0 +1,20 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname store) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #t)))
+;;
+;; ***************************************************
+;; Hao Sun(20611135)
+;; CS 135 Fall 2015
+;; Assignment 05, Problem 2
+;; ***************************************************
+;;
+
+(define-struct product (name price taxable?))
+;; A Product is a (make-product Sym Num Bool)
+;; requires: price > 0,
+;; price cannot have fractional cents.
+
+;; (have-product? target-prod lst-o-prod) takes a symbol target-prod and
+;;    a lst-o-prod return true if target-prod is one of the elements in
+;;    lst-o-prod, return false otherwise
+;; have-product?: Sym (listof Product) -> Bool

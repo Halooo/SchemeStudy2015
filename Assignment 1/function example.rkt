@@ -1,0 +1,18 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-reader.ss" "lang")((modname |function example|) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #t)))
+;; (sum-squares a b) produce the sum of the squares
+;;   of a and b
+;; sum-squares: Num Num -> Num
+
+;; examples:
+(check-expect (sum-squares 3 4) 25)
+(check-expect (sum-squares -3 -4) 25)
+
+(define (sum-squares a b)
+  (+ (sqr a) (sqr b)))
+
+;; tests:
+(check-expect (sum-squares 0 7) 49)
+(check-expect (sum-squares 0 0) 0)
+
